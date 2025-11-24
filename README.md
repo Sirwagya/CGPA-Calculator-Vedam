@@ -1,216 +1,105 @@
 # Vedam Merit Score & CGPA Calculator
 
-A web-based calculator for tracking Vedam Merit Scores and calculating ADYPU CGPA based on the official Vedam Merit Score Calculation guide.
+> **Status Notice:** This calculator is mid-refactor and still under verification. Do **not** rely on the numbers for official submissions yet—the logic is evolving and needs attentive review each time the Vedam rules or ADYPU rubrics change.
 
-## Features
+## 1. Overview
 
-- **Four Main Vedam Subjects**: 
-  - Mathematics for AI - I
-  - System & Web Basics
-  - Fundamentals of Programming - Java (merged with Workshop)
-  - Professional Communication (merged with Co-curricular Activities)
+This project is an offline-first dashboard (open `index.html`) that lets Vedam students:
+- capture contest, mock, UT, ET, and CA marks across subjects,
+- view ADYPU card totals that mirror the university grade sheets,
+- estimate CGPA + eligibility + required marks targets,
+- persist multiple scenarios in `localStorage` or export/import JSON snapshots.
 
-- **Flexible Contest Input**: 
-  - Variable contest marks (not always out of 50)
-  - Automatic scaling: Each contest scaled to /50, then total scaled to /40
-  - Support for multiple contests per subject
+## 2. Current Scope & Limitations
 
-- **Automatic ADYPU Mapping**:
-  - Maths: UT + ET + CA (from Vedam, scaled to 30)
-  - Web: UT + ET + Lab (from Vedam, scaled to 50)
-  - Java: UT + ET + Lab (from Vedam, scaled to 50) + Workshop (from Vedam, scaled to 50)
-  - Professional Communication: From Vedam (scaled to 50)
-  - Co-curricular: From Vedam (scaled to 50)
-  - Physics: UT + ET only
-  - Physics Lab: From Professional Communication Vedam (scaled to 50)
+- Semester coverage: **First semester** structure only.
+- Data fidelity: depends entirely on user inputs; no guard rails for invalid totals yet.
+- Logic validation: edge cases are tracked in `AUDIT-REPORT.md`, but manual QA is still required after each code change.
+- **Action required:** Re-run the dry-run checklist whenever Vedam releases new scaling rules or credit distributions.
 
-- **Real-time Calculations**: 
-  - Vedam Merit Score calculation with proper contest scaling
-  - ADYPU marks calculation
-  - CGPA calculation based on credits and marks
-  - Eligibility status for Innovation Lab (≥60) and Placements (≥75)
+## 3. Subject Breakdown
 
-- **Data Management**:
-  - Local storage (automatic save)
-  - Export/Import JSON data
-  - Track pending assessments
+| Area | Components | Max Marks | Notes |
+|------|------------|-----------|-------|
+| Mathematics for AI – I (E0005A) | UT (20) + ET (50) + CA (30) | 100 | UT+ET combined max stays **70**, CA adds remaining 30 |
+| System & Web Basics (E00017A) | UT (20) + ET (50) | 70 | Lab (E00017B) derives from Vedam score × 50 |
+| Fundamentals of Programming – Java (E0025A) | UT (20) + ET (50) | 70 | Lab + Workshop each mirror Vedam × 50 |
+| Professional Communication (E0028B) | LinkedIn, Assignment, CV, Presentation, Attendance, Case Study | 100 | Feeds both Prof Comm (50) and Co-curricular (50) ADYPU papers |
+| General Physics (E0018A) | UT (20) + ET (50) | 70 | Lab (E0018B) mirrors Prof Comm Vedam × 50 |
 
-## How to Use
+All UT/ET pairs default to max **70** even if only one component is known; missing parts are scaled, never assumed zero unless both are pending.
 
-### Getting Started
+## 4. Calculation Pipeline
 
-1. Open `index.html` in a web browser
-2. Enter marks for each subject in the dedicated sections
-3. Calculations update automatically
+1. **Vedam contests** – Each contest is scaled to /50, aggregated, then:
+   - scaled to /40 if mock data exists,
+   - or scaled to /100 when the mock is still pending.
+2. **Vedam total** – Contest slice + mock slice = 100.
+3. **ADYPU cards** – Subject-specific mappers convert Vedam to internal components (see table above).
+4. **CGPA engine** – Uses credit-weighted grade points with totals fixed at:
+   - Maths 100, Web/Java/Physics 70, labs/workshop/Prof Comm/Co-curricular 50 each.
+5. **Required marks helper** – Looks at pending assessments, spreads the remaining grade-point deficit across pending credits, and caps required marks to real maxima.
 
-### Entering Contest Marks
+## 5. Pending Logic Highlights
 
-For contest-based subjects (Maths, Web, Java):
+- Maths scaling:
+  - UT-only known → `(UT/20) × 70`, then CA added separately.
+  - ET-only known → `(ET/50) × 70`.
+  - Both pending → 0 until data arrives; required-marks calculator shows proportional targets.
+- Web/Java/Physics behave the same as Maths UT/ET **but without** the extra 30 CA block.
+- Mock interviews directly influence Vedam-derived CA/Lab/Workshop marks; when pending, the calculator assumes the contest slice is out of 100 and indicates the mock score needed to hit target CGPA.
 
-1. Click "+ Add Contest" to add a contest
-2. Enter **marks obtained** and **total marks** for each contest
-   - Example: If you scored 70 out of 100, enter 70 and 100
-   - The calculator automatically scales it to 35/50
-3. Mark contests as "Pending" if not yet completed
-4. Enter Mock Interview marks (out of 60)
+## 6. Using the Tool
 
-**Calculation Process**:
-1. Each contest is scaled: `(marks_obtained / total_marks) × 50`
-2. All scaled contests are summed
-3. Total is scaled to 40: `(scaled_sum / (number_of_contests × 50)) × 40`
-4. Mock interview marks (out of 60) are added
-5. Final Vedam Score = Contest_scaled + Mock_marks (out of 100)
+1. Open `index.html` (double-click or via a local HTTP server).
+2. Enter contest rows for Maths/Web/Java:
+   - Use actual raw totals (e.g., 73/120).
+   - Add/remove rows with the provided buttons.
+3. Enter mock scores (0–60) or toggle “Pending”.
+4. Fill UT/ET inputs per subject and toggle “Pending” where applicable.
+5. Scroll to the right-hand column to view:
+   - Vedam averages,
+   - CGPA snapshot,
+   - Eligibility badges,
+   - Required marks breakdown,
+   - ADYPU grade-point cards.
 
-### Professional Communication Components
+Remember to hit **Run / Save Scenario** after major edits to dump a timestamped JSON export.
 
-Enter marks for:
-- LinkedIn Profile: 10 marks
-- Assignment: 10 marks
-- CV + Email: 20 marks
-- Presentation: 40 marks
-- Attendance: 10 marks
-- Case Study: 10 marks
-- **Total: 100 marks**
+## 7. Data Persistence & Portability
 
-### ADYPU Marks
+- **Auto-save:** every change writes to `localStorage` under `vedamCGPA`.
+- **Run / Save Scenario:** recalculates everything and downloads a JSON snapshot (timestamp embedded).
+- **Export / Import:** manual control for backing up or restoring state between browsers/machines.
+- **Reset:** wipes storage and UI—use cautiously; no undo.
 
-#### Mathematics for AI - I (E0005A)
-- **UT**: 20 marks (enter manually)
-- **ET**: 50 marks (enter manually)
-- **CA**: 30 marks (automatically calculated from Vedam score)
-- **Total**: 100 marks
+## 8. Required Marks Calculator Details
 
-#### System & Web Basics (E00017A)
-- **UT**: 20 marks (enter manually)
-- **ET**: 50 marks (enter manually)
-- **Total**: 70 marks
-- **Lab (E00017B)**: 50 marks (from Web Vedam score)
+- Works per credit bucket and averages the remaining grade-point gap.
+- Guards against impossible targets by clamping to actual maxima (UT ≤ 20, ET ≤ 50, mocks ≤ 60).
+- Displays warnings if required marks push beyond realistic ranges.
+- When both UT and ET are pending for Maths, the helper now shares the 70-mark budget proportionally (20 for UT, 50 for ET) instead of over-allocating.
 
-#### Fundamentals of Programming - Java (E0025A)
-- **UT**: 20 marks (enter manually)
-- **ET**: 50 marks (enter manually)
-- **Total**: 70 marks
-- **Lab (E0025B)**: 50 marks (from Java Vedam score)
-- **Workshop (E0033B)**: 50 marks (from Java Vedam score)
+## 9. Testing / Dry-Run Expectations
 
-#### Professional Communication (E0028B)
-- **Total**: 50 marks (from Professional Communication Vedam score)
+See `AUDIT-REPORT.md` for the full checklist. Minimum scenarios to re-test after changes:
+- Maths: UT present + ET pending, ET present + UT pending, both pending, CA-only.
+- Web/Java/Physics: UT-only, ET-only, both available.
+- Mock pending vs. available for each contest-based subject.
+- Required marks when only mocks are pending.
+- Import/export round-trip with partial data.
 
-#### Co-curricular Activities - I (E0035B)
-- **Total**: 50 marks (from Professional Communication Vedam score)
+## 10. Known Gaps & Next Steps
 
-#### General Physics (E0018A)
-- **UT**: 20 marks (enter manually)
-- **ET**: 50 marks (enter manually)
-- **Total**: 70 marks
-- **Lab (E0018B)**: 50 marks (from Professional Communication Vedam score)
+- No automated tests yet—manual dry runs are mandatory.
+- Input validation is minimal; invalid totals silently corrupt results.
+- UI still lacks indicators for inconsistent states (e.g., entering > max marks).
+- Future work: multi-semester support, automated regression suite, better accessibility, richer analytics.
 
-## Calculation Formulas
+## 11. Release Log
 
-### Vedam Merit Score (Contest-based Subjects)
+| Version | Highlights |
+|---------|-----------|
+| 2.2 | Maths UT/ET scaling fixed to 70, ADYPU cards reuse helper logic, required marks rewritten to respect real maxima, subject maxima centralized. |
 
-1. **Scale each contest to /50**:
-   ```
-   Contest_scaled = (marks_obtained / total_marks) × 50
-   ```
-
-2. **Sum all scaled contests**:
-   ```
-   Scaled_sum = Sum of all Contest_scaled
-   Max_scaled = number_of_contests × 50
-   ```
-
-3. **Scale contest total to /40**:
-   ```
-   Contest_total = (Scaled_sum / Max_scaled) × 40
-   ```
-
-4. **Add Mock Interview**:
-   ```
-   Vedam_Score = Contest_total + Mock_marks (out of 60)
-   ```
-
-### ADYPU Mapping
-
-- **Maths CA**: `(Vedam_Maths / 100) × 30`
-- **Web Lab**: `(Vedam_Web / 100) × 50`
-- **Java Lab**: `(Vedam_Java / 100) × 50`
-- **Java Workshop**: `(Vedam_Java / 100) × 50`
-- **Professional Communication**: `(Vedam_ProfComm / 100) × 50`
-- **Co-curricular**: `(Vedam_ProfComm / 100) × 50`
-- **Physics Lab**: `(Vedam_ProfComm / 100) × 50`
-
-### CGPA Calculation
-
-CGPA is calculated using:
-- Grade points = (Marks / Max_marks) × 10
-- Weighted by credits
-- CGPA = Total Grade Points / Total Credits
-
-**Total Credits**: 22
-- Mathematics: 4
-- Web: 3
-- Web Lab: 1
-- Java: 3
-- Java Lab: 1
-- Workshop: 2
-- Professional Communication: 2
-- Co-curricular: 2
-- Physics: 3
-- Physics Lab: 1
-
-## Eligibility Status
-
-- **Innovation Lab Access**: Requires average Vedam Score ≥ 60
-  - Average of 4 main subjects: Maths, Web, Java, Professional Communication
-
-- **Placement Eligibility**: Requires average Vedam Score ≥ 75
-  - Average of 4 main subjects: Maths, Web, Java, Professional Communication
-  - Students with average < 30 are not considered for placements
-
-## Example Calculation
-
-**Subject: Java (4 contests)**
-- Contest 1: 40/50 → Scaled: 40/50
-- Contest 2: 35/50 → Scaled: 35/50
-- Contest 3: 28/50 → Scaled: 28/50
-- Contest 4: 30/50 → Scaled: 30/50
-- Scaled sum: 133/200
-- Contest scaled: (133/200) × 40 = 26.60
-- Mock: 50/60
-- **Vedam Total: 76.60/100**
-
-**ADYPU Mapping**:
-- Java Lab: (76.60/100) × 50 = 38.30/50
-- Workshop: (76.60/100) × 50 = 38.30/50
-
-## Browser Compatibility
-
-Works best on modern browsers:
-- Chrome/Edge (latest)
-- Firefox (latest)
-- Safari (latest)
-
-## Data Storage
-
-- Data is automatically saved to browser's localStorage
-- Export your data regularly as backup
-- Data is stored locally on your device (not uploaded anywhere)
-
-## Notes
-
-- The structure is based on Semester 1
-- Future semesters may have different structures
-- Always verify calculations with official sources
-- Missing contests/mocks are counted as 0, but scaling uses full maximum
-- Professional Communication and Co-curricular share the same Vedam score
-- Java and Workshop share the same Vedam score
-
-## Support
-
-For issues or questions, refer to the official "Vedam Merit Score Calculation - Student Guide" PDF.
-
----
-
-**Version**: 2.0  
-**Last Updated**: Based on updated Vedam Merit Score Calculation Guide
+> **Reminder:** Even though v2.2 patches major scaling bugs, the project is still a work-in-progress. Validate every outcome against official Vedam documentation before sharing results.
