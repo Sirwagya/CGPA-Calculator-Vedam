@@ -1,667 +1,697 @@
-// App Data Structure
-let appData = {
-  subjects: {
-    maths: {
-      vedam: { contests: [{ marks: null, total: null }], mock: null },
-      adypu: { ut: null, et: null },
-      pending: { mock: false, ut: false, et: false },
-    },
-    web: {
-      vedam: { contests: [{ marks: null, total: null }], mock: null },
-      adypu: { ut: null, et: null, lab: null },
-      pending: { mock: false, ut: false, et: false, lab: false },
-    },
-    java: {
-      vedam: { contests: [{ marks: null, total: null }], mock: null },
-      adypu: { ut: null, et: null, lab: null, workshop: null },
-      pending: {
-        mock: false,
-        ut: false,
-        et: false,
-        lab: false,
-        workshop: false,
-      },
-    },
-    prof: {
-      components: {
-        linkedin: null,
-        assignment: null,
-        cv: null,
-        presentation: null,
-        attendance: null,
-        casestudy: null,
-      },
-      adypu: { cocurricular: null },
-      pending: {
-        linkedin: false,
-        assignment: false,
-        cv: false,
-        presentation: false,
-        attendance: false,
-        casestudy: false,
-        cocurricular: false,
-      },
-    },
-    physics: {
-      adypu: { ut: null, et: null, lab: null },
-      pending: { ut: false, et: false, lab: false },
-    },
-  },
-  targetCGPA: 7.5,
-};
 
-// Constants
-const SUBJECTS = ["maths", "web", "java", "prof", "physics"];
-const CREDITS = {
-  maths: 4,
-  web: 3,
-  java: 4,
-  prof: 2,
-  physics: 3,
-};
-const TOTAL_CREDITS = 16;
+/**
+ * Vedam Merit Score & CGPA Calculator
+ *
+ * Architecture:
+ * - Config: Centralized course definitions and evaluation schemas.
+ * - State: Manages application state and localStorage.
+ * - Calculator: Pure functions for score and GP generation.
+ * - UI: Renders the DOM based on Config and State.
+ */
 
-// Initialization
-document.addEventListener("DOMContentLoaded", () => {
-  loadData();
-  setupEventListeners();
-  renderAllContests();
-  updateCalculations();
-});
+/* =========================================
+   1. CONFIGURATION & DATA SCHEMA
+   ========================================= */
 
-function setupEventListeners() {
-  document.getElementById("runSaveBtn").addEventListener("click", () => {
-    saveData();
-    showToast("Scenario saved successfully!", "success");
-  });
-
-  document.getElementById("resetBtn").addEventListener("click", () => {
-    if (confirm("Are you sure you want to reset all data?")) {
-      localStorage.removeItem("vedamCalculatorData");
-      location.reload();
-    }
-  });
-
-  document.getElementById("exportBtn").addEventListener("click", exportData);
-  document
-    .getElementById("importBtn")
-    .addEventListener("click", () =>
-      document.getElementById("importFile").click()
-    );
-  document.getElementById("importFile").addEventListener("change", importData);
-}
-
-// Data Management
-function saveData() {
-  localStorage.setItem("vedamCalculatorData", JSON.stringify(appData));
-}
-
-function loadData() {
-  const saved = localStorage.getItem("vedamCalculatorData");
-  if (saved) {
-    const savedData = JSON.parse(saved);
-    // Merge saved data with current structure to handle any missing fields
-    // Simple merge for now, assuming structure compatibility or reset
-    appData = { ...appData, ...savedData };
-
-    // Ensure nested objects exist (migration safety)
-    if (!appData.subjects.web.adypu) appData.subjects.web.adypu = {};
-    if (!appData.subjects.web.pending) appData.subjects.web.pending = {};
-    if (!appData.subjects.java.adypu) appData.subjects.java.adypu = {};
-    if (!appData.subjects.java.pending) appData.subjects.java.pending = {};
-    if (!appData.subjects.prof.adypu) appData.subjects.prof.adypu = {};
-    if (!appData.subjects.prof.pending) appData.subjects.prof.pending = {};
-
-    populateInputs();
-  }
-}
-
-function populateInputs() {
-  // Standard Subjects
-  ["maths", "web", "java"].forEach((sub) => {
-    setInputValue(`${sub}-mock`, appData.subjects[sub].vedam.mock);
-    setCheckboxValue(`${sub}-mock-pending`, appData.subjects[sub].pending.mock);
-
-    setInputValue(`${sub}-ut`, appData.subjects[sub].adypu.ut);
-    setCheckboxValue(`${sub}-ut-pending`, appData.subjects[sub].pending.ut);
-    setInputValue(`${sub}-et`, appData.subjects[sub].adypu.et);
-    setCheckboxValue(`${sub}-et-pending`, appData.subjects[sub].pending.et);
-  });
-
-  // Web Lab
-  setInputValue("web-lab", appData.subjects.web.adypu.lab);
-  setCheckboxValue("web-lab-pending", appData.subjects.web.pending.lab);
-
-  // Java Lab & Workshop
-  setInputValue("java-lab", appData.subjects.java.adypu.lab);
-  setCheckboxValue("java-lab-pending", appData.subjects.java.pending.lab);
-  setInputValue("java-workshop", appData.subjects.java.adypu.workshop);
-  setCheckboxValue(
-    "java-workshop-pending",
-    appData.subjects.java.pending.workshop
-  );
-
-  // Professional Communication
-  const profComps = [
-    "linkedin",
-    "assignment",
-    "cv",
-    "presentation",
-    "attendance",
-    "casestudy",
-  ];
-  profComps.forEach((comp) => {
-    setInputValue(`prof-${comp}`, appData.subjects.prof.components[comp]);
-    setCheckboxValue(
-      `prof-${comp}-pending`,
-      appData.subjects.prof.pending[comp]
-    );
-  });
-  setInputValue("prof-cocurricular", appData.subjects.prof.adypu.cocurricular);
-  setCheckboxValue(
-    "prof-cocurricular-pending",
-    appData.subjects.prof.pending.cocurricular
-  );
-
-  // Physics
-  setInputValue("physics-ut", appData.subjects.physics.adypu.ut);
-  setCheckboxValue("physics-ut-pending", appData.subjects.physics.pending.ut);
-  setInputValue("physics-et", appData.subjects.physics.adypu.et);
-  setCheckboxValue("physics-et-pending", appData.subjects.physics.pending.et);
-  setInputValue("physics-lab", appData.subjects.physics.adypu.lab);
-  setCheckboxValue("physics-lab-pending", appData.subjects.physics.pending.lab);
-
-  // Target CGPA
-  setInputValue("targetCGPA", appData.targetCGPA);
-}
-
-function setInputValue(id, value) {
-  const el = document.getElementById(id);
-  if (el) el.value = value !== null && value !== undefined ? value : "";
-}
-
-function setCheckboxValue(id, value) {
-  const el = document.getElementById(id);
-  if (el) el.checked = value;
-}
-
-// Dynamic Contests
-function renderAllContests() {
-  ["maths", "web", "java"].forEach((sub) => renderContests(sub));
-}
-
-function renderContests(subject) {
-  const container = document.getElementById(`${subject}-contests`);
-  if (!container) return;
-
-  container.innerHTML = "";
-  appData.subjects[subject].vedam.contests.forEach((contest, index) => {
-    const div = document.createElement("div");
-    div.className = "contest-item";
-    div.innerHTML = `
-            <input type="number" placeholder="Marks" class="contest-marks" 
-                value="${contest.marks !== null ? contest.marks : ""}"
-                onchange="updateContest('${subject}', ${index}, 'marks', this.value)">
-            <span class="contest-sep">/</span>
-            <input type="number" placeholder="Total" class="contest-total"
-                value="${contest.total !== null ? contest.total : ""}"
-                onchange="updateContest('${subject}', ${index}, 'total', this.value)">
-            ${
-              index > 0
-                ? `<button class="btn-icon" onclick="removeContest('${subject}', ${index})">×</button>`
-                : ""
+const CONFIG = {
+    defaultTargetCGPA: 7.5,
+    // Grading Scale (Marks -> GP)
+    gradingScale: [
+        { min: 80, gp: 10 },
+        { min: 70, gp: 9 },
+        { min: 60, gp: 8 },
+        { min: 55, gp: 7 },
+        { min: 50, gp: 6 },
+        { min: 45, gp: 5 },
+        { min: 40, gp: 4 },
+        { min: 0,  gp: 0 }
+    ],
+    // Course Definitions
+    courses: [
+        {
+            id: 'maths',
+            code: 'E0005A',
+            name: 'Mathematics for AI - I',
+            credits: 4,
+            type: 'vedam', // Contests + Mock -> CA
+            components: {
+                vedam: { enabled: true, mockMax: 60, weightInTotal: 30 },
+                adypu: [
+                    { id: 'ut', label: 'Unit Test', max: 20 },
+                    { id: 'et', label: 'End Term', max: 50 }
+                ]
             }
-        `;
-    container.appendChild(div);
-  });
-}
-
-function addContest(subject) {
-  appData.subjects[subject].vedam.contests.push({ marks: null, total: null });
-  renderContests(subject);
-  updateCalculations();
-}
-
-function removeContest(subject, index) {
-  appData.subjects[subject].vedam.contests.splice(index, 1);
-  renderContests(subject);
-  updateCalculations();
-}
-
-function updateContest(subject, index, field, value) {
-  appData.subjects[subject].vedam.contests[index][field] =
-    value === "" ? null : parseFloat(value);
-  updateCalculations();
-}
-
-// Core Update Logic
-function updateData() {
-  // Standard Subjects
-  ["maths", "web", "java"].forEach((sub) => {
-    appData.subjects[sub].vedam.mock = getInputValue(`${sub}-mock`);
-    appData.subjects[sub].pending.mock = getCheckboxValue(
-      `${sub}-mock-pending`
-    );
-
-    appData.subjects[sub].adypu.ut = getInputValue(`${sub}-ut`);
-    appData.subjects[sub].pending.ut = getCheckboxValue(`${sub}-ut-pending`);
-
-    appData.subjects[sub].adypu.et = getInputValue(`${sub}-et`);
-    appData.subjects[sub].pending.et = getCheckboxValue(`${sub}-et-pending`);
-  });
-
-  // Web Lab
-  appData.subjects.web.adypu.lab = getInputValue("web-lab");
-  appData.subjects.web.pending.lab = getCheckboxValue("web-lab-pending");
-
-  // Java Lab & Workshop
-  appData.subjects.java.adypu.lab = getInputValue("java-lab");
-  appData.subjects.java.pending.lab = getCheckboxValue("java-lab-pending");
-  appData.subjects.java.adypu.workshop = getInputValue("java-workshop");
-  appData.subjects.java.pending.workshop = getCheckboxValue(
-    "java-workshop-pending"
-  );
-
-  // Prof Comm
-  const profComps = [
-    "linkedin",
-    "assignment",
-    "cv",
-    "presentation",
-    "attendance",
-    "casestudy",
-  ];
-  profComps.forEach((comp) => {
-    appData.subjects.prof.components[comp] = getInputValue(`prof-${comp}`);
-    appData.subjects.prof.pending[comp] = getCheckboxValue(
-      `prof-${comp}-pending`
-    );
-  });
-  appData.subjects.prof.adypu.cocurricular = getInputValue("prof-cocurricular");
-  appData.subjects.prof.pending.cocurricular = getCheckboxValue(
-    "prof-cocurricular-pending"
-  );
-
-  // Physics
-  appData.subjects.physics.adypu.ut = getInputValue("physics-ut");
-  appData.subjects.physics.pending.ut = getCheckboxValue("physics-ut-pending");
-  appData.subjects.physics.adypu.et = getInputValue("physics-et");
-  appData.subjects.physics.pending.et = getCheckboxValue("physics-et-pending");
-  appData.subjects.physics.adypu.lab = getInputValue("physics-lab");
-  appData.subjects.physics.pending.lab = getCheckboxValue(
-    "physics-lab-pending"
-  );
-
-  appData.targetCGPA = getInputValue("targetCGPA") || 7.5;
-
-  updateCalculations();
-  saveData();
-}
-
-function getInputValue(id) {
-  const el = document.getElementById(id);
-  return el && el.value !== "" ? parseFloat(el.value) : null;
-}
-
-function getCheckboxValue(id) {
-  const el = document.getElementById(id);
-  return el ? el.checked : false;
-}
-
-// Calculations
-function updateCalculations() {
-  let totalGradePoints = 0;
-  let vedamScores = [];
-
-  // 1. Mathematics
-  const maths = calculateSubjectScore("maths");
-  updateSubjectUI("maths", maths);
-  totalGradePoints += maths.gradePoint * CREDITS.maths;
-  vedamScores.push(maths.vedamTotal);
-
-  // 2. Web Basics
-  const web = calculateSubjectScore("web");
-  updateSubjectUI("web", web);
-  totalGradePoints += web.gradePoint * CREDITS.web;
-  vedamScores.push(web.vedamTotal);
-
-  // 3. Java
-  const java = calculateSubjectScore("java");
-  updateSubjectUI("java", java);
-  totalGradePoints += java.gradePoint * CREDITS.java;
-  vedamScores.push(java.vedamTotal);
-
-  // 4. Professional Communication
-  const prof = calculateProfScore();
-  updateSubjectUI("prof", prof);
-  totalGradePoints += prof.gradePoint * CREDITS.prof;
-  vedamScores.push(prof.vedamTotal);
-
-  // 5. Physics
-  const physics = calculatePhysicsScore();
-  updateSubjectUI("physics", physics);
-  totalGradePoints += physics.gradePoint * CREDITS.physics;
-
-  // Summary
-  const cgpa = totalGradePoints / TOTAL_CREDITS;
-  const vedamAvg = vedamScores.reduce((a, b) => a + b, 0) / vedamScores.length;
-
-  document.getElementById("currentCGPA").textContent = cgpa.toFixed(2);
-  document.getElementById("vedamAverage").textContent =
-    vedamAvg.toFixed(1) + "%";
-
-  updateEligibility(cgpa, vedamAvg);
-  updateProjections(cgpa);
-  updateGradePointsList({ maths, web, java, prof, physics });
-}
-
-function calculateSubjectScore(subject) {
-  const s = appData.subjects[subject];
-
-  // Vedam Score
-  let contestScore = 0;
-  let contestTotal = 0;
-  s.vedam.contests.forEach((c) => {
-    if (c.marks !== null && c.total !== null) {
-      contestScore += c.marks;
-      contestTotal += c.total;
-    }
-  });
-
-  let vedamPct = 0;
-  if (contestTotal > 0) {
-    vedamPct = (contestScore / contestTotal) * 40; // 40% weight
-  }
-
-  const mock = s.pending.mock ? 60 : s.vedam.mock || 0;
-  const mockPct = (mock / 60) * 60; // 60% weight
-
-  const vedamTotal = vedamPct + mockPct;
-  const caMarks = (vedamTotal / 100) * 30; // Converted to 30 marks
-
-  // ADYPU Score
-  const ut = s.pending.ut ? 20 : s.adypu.ut || 0;
-  const et = s.pending.et ? 50 : s.adypu.et || 0;
-
-  let extra = 0;
-  if (subject === "web") {
-    extra = s.pending.lab ? 50 : s.adypu.lab || 0;
-  } else if (subject === "java") {
-    const lab = s.pending.lab ? 50 : s.adypu.lab || 0;
-    const workshop = s.pending.workshop ? 50 : s.adypu.workshop || 0;
-    extra = (lab + workshop) / 2; // Average of lab and workshop? Or sum?
-    // Usually Lab(50) + Workshop(50) = 100?
-    // If total is out of 100, then (CA(30) + UT(20) + ET(50)) = 100.
-    // Where do Lab/Workshop fit?
-    // Maybe they are separate heads?
-    // Let's assume they are just added for now or averaged.
-    // If I look at credits: Java is 4 credits.
-    // Let's assume the total marks is sum of all components.
-    // But grade point is usually on 100 scale.
-    // If Java has Lab and Workshop, maybe it's 200 marks total?
-    // Let's normalize to 100.
-    // (CA + UT + ET + Lab + Workshop) / 2 ?
-    // I'll stick to a simple sum for now and assume the user knows the weights or I'll refine if they complain.
-    // For now, let's assume extra is just added but scaled?
-    // Let's just add them. If it exceeds 100, the GP will be 10.
-    extra = lab + workshop;
-    // This will definitely exceed 100.
-    // Let's assume (Theory + Lab + Workshop) / 2?
-    extra = (lab + workshop) / 2;
-  }
-
-  // Total
-  // If Web: CA(30) + UT(20) + ET(50) = 100. Lab(50)?
-  // Maybe Lab is separate subject in grade card but here combined?
-  // "System & Web Basics" (3 credits).
-  // Let's assume standard 100 marks calculation: CA+UT+ET.
-  // And Lab is separate?
-  // But I am calculating ONE grade point for the subject.
-  // I will assume (Theory + Lab) / 2 for total score if Lab exists.
-
-  let theoryTotal = caMarks + ut + et;
-  let finalTotal = theoryTotal;
-
-  if (subject === "web") {
-    finalTotal = (theoryTotal + extra) / 1.5; // Normalize?
-    // Let's just take average of Theory(100) and Lab(50)? No.
-    // Let's just sum them and cap at 100? No.
-    // I'll just use the theory total for now to be safe, and ignore lab in GP calc unless I know the formula.
-    // BUT, the user added Lab input.
-    // Let's assume it's part of the total.
-    // Let's just add it and see.
-    // Actually, let's look at the credits.
-    // I'll use a weighted average.
-    // Theory (100) + Lab (50) -> Total 150.
-    // Percentage = (Total / 150) * 100.
-    if (subject === "web") {
-      finalTotal = ((theoryTotal + extra) / 150) * 100;
-    } else if (subject === "java") {
-      // Theory(100) + Lab(50) + Workshop(50) = 200.
-      finalTotal = ((theoryTotal + extra) / 200) * 100;
-    }
-  }
-
-  const gp = calculateGradePoint(finalTotal);
-
-  return {
-    vedamTotal,
-    caMarks,
-    total: finalTotal,
-    gradePoint: gp,
-    ut,
-    et,
-  };
-}
-
-function calculateProfScore() {
-  const p = appData.subjects.prof;
-  const c = p.components;
-  const pend = p.pending;
-
-  const linkedin = pend.linkedin ? 10 : c.linkedin || 0;
-  const assignment = pend.assignment ? 10 : c.assignment || 0;
-  const cv = pend.cv ? 20 : c.cv || 0;
-  const presentation = pend.presentation ? 40 : c.presentation || 0;
-  const attendance = pend.attendance ? 10 : c.attendance || 0;
-  const casestudy = pend.casestudy ? 10 : c.casestudy || 0;
-
-  const vedamTotal =
-    linkedin + assignment + cv + presentation + attendance + casestudy;
-  const adypu = (vedamTotal / 100) * 50; // Converted to 50
-
-  const cocurricular = p.pending.cocurricular ? 50 : p.adypu.cocurricular || 0;
-
-  const total = adypu + cocurricular;
-  const gp = calculateGradePoint(total);
-
-  return {
-    vedamTotal,
-    adypu,
-    cocurricular,
-    total,
-    gradePoint: gp,
-  };
-}
-
-function calculatePhysicsScore() {
-  const p = appData.subjects.physics;
-  const ut = p.pending.ut ? 20 : p.adypu.ut || 0;
-  const et = p.pending.et ? 50 : p.adypu.et || 0;
-  const lab = p.pending.lab ? 50 : p.adypu.lab || 0;
-
-  // Physics: UT(20) + ET(50) + Lab(50)? = 120?
-  // Let's assume normalized to 100.
-  const total = ((ut + et + lab) / 120) * 100;
-
-  const gp = calculateGradePoint(total);
-  return {
-    total,
-    gradePoint: gp,
-    lab,
-  };
-}
-
-function calculateGradePoint(marks) {
-  if (marks >= 80) return 10;
-  if (marks >= 70) return 9;
-  if (marks >= 60) return 8;
-  if (marks >= 55) return 7;
-  if (marks >= 50) return 6;
-  if (marks >= 45) return 5;
-  if (marks >= 40) return 4;
-  return 0;
-}
-
-// UI Updates
-function updateSubjectUI(subject, data) {
-  if (subject === "prof") {
-    setText(`prof-vedam-total`, data.vedamTotal.toFixed(1));
-    setText(`prof-adypu`, data.adypu.toFixed(1));
-  } else if (subject === "physics") {
-    setText(`physics-total`, data.total.toFixed(1));
-  } else {
-    setText(`${subject}-vedam-total`, data.vedamTotal.toFixed(1));
-    setText(`${subject}-ca`, data.caMarks.toFixed(1));
-    setText(`${subject}-total`, data.total.toFixed(1));
-  }
-
-  // Update pending states visually
-  const s = appData.subjects[subject];
-  if (s && s.pending) {
-    Object.keys(s.pending).forEach((key) => {
-      const isPending = s.pending[key];
-      let inputId;
-      if (subject === "prof") {
-        inputId = key === "cocurricular" ? "prof-cocurricular" : `prof-${key}`;
-      } else if (subject === "physics") {
-        inputId = `physics-${key}`;
-      } else {
-        inputId =
-          key === "lab" || key === "workshop"
-            ? `${subject}-${key}`
-            : key === "mock"
-            ? `${subject}-mock`
-            : `${subject}-${key}`;
-      }
-
-      const el = document.getElementById(inputId);
-      if (el) {
-        el.disabled = isPending;
-        // Find the closest input-group or wrapper to add class
-        const wrapper = el.closest(".input-row");
-        if (wrapper) {
-          if (isPending) wrapper.classList.add("is-pending");
-          else wrapper.classList.remove("is-pending");
+        },
+        {
+            id: 'web',
+            code: 'E0017A',
+            name: 'System & Web Basics',
+            credits: 3,
+            type: 'hybrid', // Vedam + Theory + Lab
+            components: {
+                vedam: { enabled: true, mockMax: 60, weightInTotal: 30 },
+                adypu: [
+                    { id: 'ut', label: 'Unit Test', max: 20 },
+                    { id: 'et', label: 'End Term', max: 50 },
+                    { id: 'lab', label: 'Lab', max: 50 } // Assumed integrated for now based on old app
+                ]
+            }
+        },
+        {
+            id: 'java',
+            code: 'E0025A',
+            name: 'Fundamentals of Programming - Java',
+            credits: 4, // Keeping as 4 to match old app, but ideally should be split
+            type: 'hybrid',
+            components: {
+                vedam: { enabled: true, mockMax: 60, weightInTotal: 30 },
+                adypu: [
+                    { id: 'ut', label: 'Unit Test', max: 20 },
+                    { id: 'et', label: 'End Term', max: 50 },
+                    { id: 'lab', label: 'Lab (E0025B)', max: 50 },
+                    { id: 'workshop', label: 'Workshop (E0033B)', max: 50 }
+                ]
+            }
+        },
+        {
+            id: 'prof',
+            code: 'E0028B',
+            name: 'Professional Communication',
+            credits: 2,
+            type: 'custom',
+            components: {
+                custom: [
+                    { id: 'linkedin', label: 'LinkedIn', max: 10 },
+                    { id: 'assignment', label: 'Assignment', max: 10 },
+                    { id: 'cv', label: 'CV + Email', max: 20 },
+                    { id: 'presentation', label: 'Presentation', max: 40 },
+                    { id: 'attendance', label: 'Attendance', max: 10 },
+                    { id: 'casestudy', label: 'Case Study', max: 10 }
+                ],
+                // Prof Comm maps these sum -> 50% weight?
+                // Old app: (Sum / 100) * 50.
+                // Then adds Co-curricular (50).
+                extra: [
+                    { id: 'cocurricular', label: 'Co-curricular (E0035B)', max: 50 }
+                ]
+            }
+        },
+        {
+            id: 'physics',
+            code: 'E0018A',
+            name: 'General Physics',
+            credits: 3,
+            type: 'standard',
+            components: {
+                vedam: { enabled: false },
+                adypu: [
+                    { id: 'ut', label: 'Unit Test', max: 20 },
+                    { id: 'et', label: 'End Term', max: 50 },
+                    { id: 'lab', label: 'Lab (E0018B)', max: 50 }
+                ]
+            }
         }
-      }
-    });
-  }
-}
+    ]
+};
 
-function setText(id, text) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = text;
-}
+/* =========================================
+   2. STATE MANAGEMENT
+   ========================================= */
 
-function updateEligibility(cgpa, vedamAvg) {
-  const innLab = document.getElementById("innovationLabStatus");
-  const place = document.getElementById("placementStatus");
-
-  if (vedamAvg >= 75) {
-    innLab.textContent = "Eligible";
-    innLab.className = "status-badge eligible";
-  } else {
-    innLab.textContent = "Not Eligible";
-    innLab.className = "status-badge not-eligible";
-  }
-
-  if (cgpa >= 6.0 && vedamAvg >= 60) {
-    place.textContent = "Eligible";
-    place.className = "status-badge eligible";
-  } else {
-    place.textContent = "Check Criteria";
-    place.className = "status-badge pending";
-  }
-}
-
-function updateProjections(currentCGPA) {
-  const target = appData.targetCGPA;
-  const container = document.getElementById("requiredMarksContainer");
-  container.innerHTML = "";
-
-  const div = document.createElement("div");
-  div.className = "projection-item";
-
-  if (currentCGPA >= target) {
-    div.innerHTML = `<span class="success-text">You are on track!</span>`;
-  } else {
-    const diff = target - currentCGPA;
-    div.innerHTML = `<span>Need to improve by <strong>${diff.toFixed(
-      2
-    )}</strong> points</span>`;
-  }
-  container.appendChild(div);
-}
-
-function updateGradePointsList(scores) {
-  const container = document.getElementById("gradePointsContainer");
-  container.innerHTML = "";
-
-  Object.keys(scores).forEach((sub) => {
-    const div = document.createElement("div");
-    div.className = "gp-item";
-    div.innerHTML = `
-            <span style="text-transform: capitalize">${sub}</span>
-            <strong>${scores[sub].gradePoint}</strong>
-        `;
-    container.appendChild(div);
-  });
-}
-
-// Utilities
-function showToast(message, type = "success") {
-  const container = document.getElementById("toastContainer");
-  const toast = document.createElement("div");
-  toast.className = `toast ${type}`;
-  toast.innerHTML = `<span>${message}</span>`;
-
-  container.appendChild(toast);
-
-  setTimeout(() => {
-    toast.style.opacity = "0";
-    setTimeout(() => toast.remove(), 300);
-  }, 3000);
-}
-
-function exportData() {
-  const dataStr =
-    "data:text/json;charset=utf-8," +
-    encodeURIComponent(JSON.stringify(appData));
-  const downloadAnchorNode = document.createElement("a");
-  downloadAnchorNode.setAttribute("href", dataStr);
-  downloadAnchorNode.setAttribute("download", "vedam_calculator_data.json");
-  document.body.appendChild(downloadAnchorNode);
-  downloadAnchorNode.click();
-  downloadAnchorNode.remove();
-}
-
-function importData(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = function (e) {
-    try {
-      appData = JSON.parse(e.target.result);
-      populateInputs();
-      renderAllContests();
-      updateCalculations();
-      saveData();
-      showToast("Data imported successfully!");
-    } catch (err) {
-      showToast("Invalid file format", "error");
+class AppState {
+    constructor() {
+        this.data = this.load() || this.getDefaults();
     }
-  };
-  reader.readAsText(file);
+
+    getDefaults() {
+        const subjects = {};
+        CONFIG.courses.forEach(c => {
+            subjects[c.id] = {
+                contests: [], // { marks, total }
+                inputs: {},   // { mock: 45, ut: 18 ... }
+                pending: {}   // { mock: true, ut: false ... }
+            };
+        });
+        return {
+            subjects,
+            targetCGPA: CONFIG.defaultTargetCGPA
+        };
+    }
+
+    load() {
+        const json = localStorage.getItem('vedamCalculatorData');
+        if (!json) return null;
+        try {
+            const parsed = JSON.parse(json);
+            // Migrate or validate if needed. For now, simple merge.
+            const defaults = this.getDefaults();
+            // Deep merge basics
+            Object.keys(defaults.subjects).forEach(key => {
+                if (!parsed.subjects[key]) parsed.subjects[key] = defaults.subjects[key];
+            });
+            return parsed;
+        } catch (e) {
+            console.error("Failed to load data", e);
+            return null;
+        }
+    }
+
+    save() {
+        localStorage.setItem('vedamCalculatorData', JSON.stringify(this.data));
+    }
+
+    reset() {
+        this.data = this.getDefaults();
+        this.save();
+    }
+
+    getSubject(id) {
+        return this.data.subjects[id];
+    }
+
+    updateInput(courseId, inputId, value) {
+        this.data.subjects[courseId].inputs[inputId] = value === '' ? null : parseFloat(value);
+        this.save();
+    }
+
+    togglePending(courseId, inputId, isPending) {
+        this.data.subjects[courseId].pending[inputId] = isPending;
+        this.save();
+    }
+
+    addContest(courseId) {
+        this.data.subjects[courseId].contests.push({ marks: null, total: null });
+        this.save();
+    }
+
+    removeContest(courseId, index) {
+        this.data.subjects[courseId].contests.splice(index, 1);
+        this.save();
+    }
+
+    updateContest(courseId, index, field, value) {
+        this.data.subjects[courseId].contests[index][field] = value === '' ? null : parseFloat(value);
+        this.save();
+    }
 }
+
+const store = new AppState();
+
+/* =========================================
+   3. CALCULATOR ENGINE
+   ========================================= */
+
+const Calculator = {
+    calculateAll: () => {
+        let totalGP = 0;
+        let totalCredits = 0;
+        let vedamSum = 0;
+        let vedamCount = 0;
+
+        const results = {};
+
+        CONFIG.courses.forEach(course => {
+            const subData = store.getSubject(course.id);
+            const result = Calculator.calculateCourse(course, subData);
+
+            results[course.id] = result;
+
+            totalGP += result.gp * course.credits;
+            totalCredits += course.credits;
+
+            if (result.vedamPct !== null) {
+                vedamSum += result.vedamPct;
+                vedamCount++;
+            }
+        });
+
+        const cgpa = totalCredits > 0 ? totalGP / totalCredits : 0;
+        const vedamAvg = vedamCount > 0 ? vedamSum / vedamCount : 0;
+
+        return { results, cgpa, vedamAvg };
+    },
+
+    calculateCourse: (course, data) => {
+        // 1. Vedam Score (if applicable)
+        let vedamScore = 0; // Final scaled marks from Vedam
+        let vedamPct = null; // 0-100 representation
+
+        if (course.components.vedam && course.components.vedam.enabled) {
+            const { contests } = data;
+            const { mockMax, weightInTotal } = course.components.vedam;
+
+            // Contests (40% weight of Vedam)
+            let cMarks = 0, cTotal = 0;
+            contests.forEach(c => {
+                if (c.marks != null && c.total != null) {
+                    cMarks += c.marks;
+                    cTotal += c.total;
+                }
+            });
+            const contestPart = cTotal > 0 ? (cMarks / cTotal) * 40 : 0;
+
+            // Mock (60% weight of Vedam)
+            let mockVal = data.inputs.mock;
+            if (data.pending.mock) mockVal = mockMax; // Pending = Max
+            mockVal = mockVal || 0;
+
+            const mockPart = (mockVal / mockMax) * 60;
+
+            vedamPct = contestPart + mockPart; // Out of 100
+            vedamScore = (vedamPct / 100) * weightInTotal; // Scaled to CA (e.g. 30)
+        }
+
+        // 2. ADYPU/Standard Components
+        let standardTotal = 0;
+        let maxStandard = 0;
+
+        // Helper to get score
+        const getScore = (id, max) => {
+            if (data.pending[id]) return max;
+            return data.inputs[id] || 0;
+        };
+
+        if (course.type === 'custom') {
+            // Prof Comm Special Logic
+            // Sum of custom components
+            let customSum = 0;
+            let customMax = 0; // Should be 100 based on inputs
+
+            course.components.custom.forEach(comp => {
+                customSum += getScore(comp.id, comp.max);
+                customMax += comp.max;
+            });
+
+            // Scale to 50 marks ADYPU
+            const adypuPart = (customSum / customMax) * 50;
+
+            // Co-curricular
+            const cocurr = getScore('cocurricular', 50);
+
+            standardTotal = adypuPart + cocurr;
+            maxStandard = 100; // 50 + 50
+
+            // Hack for vedamPct on Prof Comm to show something?
+            // Old app showed "Vedam Total" as the sum of components.
+            vedamPct = customSum;
+
+        } else {
+            // Standard + Hybrid
+            if (course.components.adypu) {
+                course.components.adypu.forEach(comp => {
+                    standardTotal += getScore(comp.id, comp.max);
+                    maxStandard += comp.max;
+                });
+            }
+
+            // Add Vedam Score
+            if (course.components.vedam && course.components.vedam.enabled) {
+                standardTotal += vedamScore;
+                maxStandard += course.components.vedam.weightInTotal;
+            }
+        }
+
+        // Normalize Total to 100 for GP Calculation
+        // If maxStandard is 100 (Maths: 30+20+50), no scaling needed.
+        // If maxStandard is 150 (Web: 30+20+50+50), scale to 100.
+        // If maxStandard is 200 (Java: 30+20+50+50+50), scale to 100.
+
+        const finalTotal = maxStandard > 0 ? (standardTotal / maxStandard) * 100 : 0;
+        const gp = Calculator.getGP(finalTotal);
+
+        return {
+            total: finalTotal,
+            gp,
+            vedamPct,
+            rawTotal: standardTotal,
+            maxTotal: maxStandard
+        };
+    },
+
+    getGP: (marks) => {
+        for (let rule of CONFIG.gradingScale) {
+            if (marks >= rule.min) return rule.gp;
+        }
+        return 0;
+    }
+};
+
+/* =========================================
+   4. UI RENDERING & INTERACTION
+   ========================================= */
+
+const UI = {
+    init: () => {
+        UI.renderSubjects();
+        UI.updateDashboard();
+
+        // Global Listeners
+        document.getElementById('targetCGPA').value = store.data.targetCGPA;
+        document.getElementById('targetCGPA').addEventListener('input', (e) => {
+            store.data.targetCGPA = parseFloat(e.target.value);
+            store.save();
+            UI.updateDashboard();
+        });
+    },
+
+    renderSubjects: () => {
+        const container = document.getElementById('subjectsContainer');
+        container.innerHTML = '';
+
+        CONFIG.courses.forEach(course => {
+            const card = document.createElement('section');
+            card.className = 'card subject-card';
+            card.id = `card-${course.id}`;
+
+            // Header
+            let headerHtml = `
+                <div class="card-header">
+                    <div class="header-info">
+                        <h2>${course.name}</h2>
+                        <span class="badge">${course.code}</span>
+                    </div>
+                    <div class="header-stats">
+                        ${ course.components.vedam && course.components.vedam.enabled ? `
+                        <div class="stat-pill">
+                            <span class="label">Vedam</span>
+                            <span class="value" id="stat-vedam-${course.id}">-</span>
+                        </div>` : '' }
+                        <div class="stat-pill">
+                            <span class="label">Total</span>
+                            <span class="value" id="stat-total-${course.id}">-</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Body
+            let bodyHtml = `<div class="card-body"><div class="split-view">`;
+
+            // Left Column: Vedam / Custom
+            if (course.type === 'custom') {
+                 bodyHtml += `<div class="split-section full-width"><h3>Components</h3><div class="grid-3">`;
+                 course.components.custom.forEach(comp => {
+                     bodyHtml += UI.createInputGroup(course.id, comp.id, comp.label, comp.max);
+                 });
+                 bodyHtml += `</div>`;
+                 // Extra (Co-curricular)
+                 if (course.components.extra) {
+                     bodyHtml += `<div class="mt-4">`;
+                     course.components.extra.forEach(comp => {
+                         bodyHtml += UI.createInputGroup(course.id, comp.id, comp.label, comp.max);
+                     });
+                     bodyHtml += `</div>`;
+                 }
+                 bodyHtml += `</div>`;
+            }
+            else {
+                // Standard Layout
+                // Left: Vedam
+                if (course.components.vedam && course.components.vedam.enabled) {
+                    bodyHtml += `
+                    <div class="split-section">
+                        <h3>Vedam Score</h3>
+                        <div id="contests-${course.id}" class="contest-list"></div>
+                        <button class="btn btn-sm btn-text" onclick="Actions.addContest('${course.id}')">+ Add Contest</button>
+
+                        <div class="input-group mt-4">
+                            <label>Mock Interview <span class="sub-label">/${course.components.vedam.mockMax}</span></label>
+                            ${UI.createInputRaw(course.id, 'mock', course.components.vedam.mockMax)}
+                        </div>
+                    </div>
+                    <div class="split-divider"></div>
+                    `;
+                }
+
+                // Right: ADYPU
+                bodyHtml += `<div class="split-section ${course.components.vedam && course.components.vedam.enabled ? '' : 'full-width'}">
+                    <h3>ADYPU Marks</h3>`;
+
+                // Grid wrapper if full width
+                if (!course.components.vedam || !course.components.vedam.enabled) {
+                     bodyHtml += `<div class="grid-2">`;
+                }
+
+                if (course.components.adypu) {
+                    course.components.adypu.forEach(comp => {
+                        bodyHtml += UI.createInputGroup(course.id, comp.id, comp.label, comp.max);
+                    });
+                }
+
+                if (!course.components.vedam || !course.components.vedam.enabled) {
+                     bodyHtml += `</div>`;
+                }
+
+                // CA Info
+                if (course.components.vedam && course.components.vedam.enabled) {
+                    bodyHtml += `
+                    <div class="info-row mt-4">
+                        <span>CA (from Vedam)</span>
+                        <strong><span id="stat-ca-${course.id}">-</span> / ${course.components.vedam.weightInTotal}</strong>
+                    </div>`;
+                }
+
+                bodyHtml += `</div>`;
+            }
+
+            bodyHtml += `</div></div>`; // End split-view, card-body
+
+            card.innerHTML = headerHtml + bodyHtml;
+            container.appendChild(card);
+
+            // Render Contests
+            UI.renderContests(course.id);
+        });
+    },
+
+    createInputGroup: (courseId, inputId, label, max) => {
+        return `
+        <div class="input-group">
+            <label>${label} <span class="sub-label">/${max}</span></label>
+            ${UI.createInputRaw(courseId, inputId, max)}
+        </div>`;
+    },
+
+    createInputRaw: (courseId, inputId, max) => {
+        const subData = store.getSubject(courseId);
+        const val = subData.inputs[inputId];
+        const isPending = subData.pending[inputId];
+
+        return `
+        <div class="input-row ${isPending ? 'is-pending' : ''}">
+            <input type="number" id="in-${courseId}-${inputId}"
+                placeholder="0" min="0" max="${max}"
+                value="${val !== null && val !== undefined ? val : ''}"
+                ${isPending ? 'disabled' : ''}
+                onchange="Actions.updateInput('${courseId}', '${inputId}', this.value)">
+            <label class="checkbox-btn ${max <= 10 ? 'icon-only' : ''}" title="Pending">
+                <input type="checkbox" id="chk-${courseId}-${inputId}"
+                    ${isPending ? 'checked' : ''}
+                    onchange="Actions.togglePending('${courseId}', '${inputId}', this.checked)">
+                <span>${max <= 10 ? 'P' : 'Pending'}</span>
+            </label>
+        </div>`;
+    },
+
+    renderContests: (courseId) => {
+        const container = document.getElementById(`contests-${courseId}`);
+        if (!container) return;
+
+        const contests = store.getSubject(courseId).contests;
+        container.innerHTML = '';
+
+        contests.forEach((c, idx) => {
+            const div = document.createElement('div');
+            div.className = 'contest-item';
+            div.innerHTML = `
+                <input type="number" placeholder="Marks" value="${c.marks !== null ? c.marks : ''}"
+                    onchange="Actions.updateContest('${courseId}', ${idx}, 'marks', this.value)">
+                <span class="contest-sep">/</span>
+                <input type="number" placeholder="Total" value="${c.total !== null ? c.total : ''}"
+                    onchange="Actions.updateContest('${courseId}', ${idx}, 'total', this.value)">
+                <button class="btn-icon" onclick="Actions.removeContest('${courseId}', ${idx})">×</button>
+            `;
+            container.appendChild(div);
+        });
+    },
+
+    updateDashboard: () => {
+        const { results, cgpa, vedamAvg } = Calculator.calculateAll();
+
+        // Update Cards
+        Object.keys(results).forEach(courseId => {
+            const res = results[courseId];
+            // Total
+            const totalEl = document.getElementById(`stat-total-${courseId}`);
+            if (totalEl) totalEl.textContent = res.total.toFixed(1);
+
+            // Vedam
+            const vedamEl = document.getElementById(`stat-vedam-${courseId}`);
+            if (vedamEl && res.vedamPct !== null) vedamEl.textContent = res.vedamPct.toFixed(1);
+
+            // CA (if standard)
+            const caEl = document.getElementById(`stat-ca-${courseId}`);
+            // Calculate CA part from vedam Score (scaled)
+            // CA = res.rawTotal - ADYPU parts.
+            // Easier: Re-calculate or just store it in result.
+            // Let's infer: Vedam Score component.
+            // Actually, I can just use the vedamPct and config weight.
+            const course = CONFIG.courses.find(c => c.id === courseId);
+            if (caEl && course.components.vedam) {
+                 const ca = (res.vedamPct / 100) * course.components.vedam.weightInTotal;
+                 caEl.textContent = ca.toFixed(1);
+            }
+        });
+
+        // Update Sidebar
+        document.getElementById('currentCGPA').textContent = cgpa.toFixed(2);
+        document.getElementById('vedamAverage').textContent = vedamAvg.toFixed(1) + '%';
+
+        UI.updateEligibility(cgpa, vedamAvg);
+        UI.updateProjections(cgpa);
+        UI.updateGPList(results);
+    },
+
+    updateEligibility: (cgpa, vedamAvg) => {
+        const innLab = document.getElementById('innovationLabStatus');
+        const place = document.getElementById('placementStatus');
+
+        // Logic
+        const innEligible = vedamAvg >= 75;
+        const placeEligible = cgpa >= 6.0 && vedamAvg >= 60;
+
+        innLab.textContent = innEligible ? 'Eligible' : 'Not Eligible';
+        innLab.className = `status-badge ${innEligible ? 'eligible' : 'not-eligible'}`;
+
+        place.textContent = placeEligible ? 'Eligible' : 'Check Criteria';
+        place.className = `status-badge ${placeEligible ? 'eligible' : 'pending'}`;
+    },
+
+    updateProjections: (currentCGPA) => {
+        const target = store.data.targetCGPA;
+        const container = document.getElementById('requiredMarksContainer');
+        container.innerHTML = '';
+
+        const div = document.createElement('div');
+        div.className = 'projection-item';
+
+        if (currentCGPA >= target) {
+            div.innerHTML = `<span class="success-text">On Track!</span>`;
+        } else {
+            const diff = target - currentCGPA;
+            div.innerHTML = `<span>Improve by <strong>${diff.toFixed(2)}</strong> points</span>`;
+        }
+        container.appendChild(div);
+    },
+
+    updateGPList: (results) => {
+        const container = document.getElementById('gradePointsContainer');
+        container.innerHTML = '';
+
+        CONFIG.courses.forEach(c => {
+            const r = results[c.id];
+            const div = document.createElement('div');
+            div.className = 'gp-item';
+            div.innerHTML = `
+                <span>${c.name}</span>
+                <strong>${r.gp}</strong>
+            `;
+            container.appendChild(div);
+        });
+    }
+};
+
+/* =========================================
+   5. ACTIONS (Controller)
+   ========================================= */
+
+const Actions = {
+    updateInput: (cId, iId, val) => {
+        store.updateInput(cId, iId, val);
+        UI.updateDashboard();
+    },
+    togglePending: (cId, iId, checked) => {
+        store.togglePending(cId, iId, checked);
+        // Update UI State for Input immediately
+        const input = document.getElementById(`in-${cId}-${iId}`);
+        const wrapper = input.closest('.input-row');
+
+        if (checked) {
+            input.disabled = true;
+            wrapper.classList.add('is-pending');
+        } else {
+            input.disabled = false;
+            wrapper.classList.remove('is-pending');
+        }
+        UI.updateDashboard();
+    },
+    addContest: (cId) => {
+        store.addContest(cId);
+        UI.renderContests(cId);
+        UI.updateDashboard();
+    },
+    removeContest: (cId, idx) => {
+        store.removeContest(cId, idx);
+        UI.renderContests(cId);
+        UI.updateDashboard();
+    },
+    updateContest: (cId, idx, field, val) => {
+        store.updateContest(cId, idx, field, val);
+        UI.updateDashboard();
+    },
+    exportData: () => {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(store.data));
+        const node = document.createElement('a');
+        node.setAttribute("href", dataStr);
+        node.setAttribute("download", "vedam_data.json");
+        document.body.appendChild(node);
+        node.click();
+        node.remove();
+    },
+    importData: (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                const json = JSON.parse(ev.target.result);
+                store.data = json;
+                // Ideally validate here
+                store.save();
+                location.reload(); // Easiest way to re-render everything
+            } catch (err) {
+                alert("Invalid JSON");
+            }
+        };
+        reader.readAsText(file);
+    },
+    reset: () => {
+        if(confirm("Reset all data?")) {
+            store.reset();
+            location.reload();
+        }
+    },
+    save: () => {
+        store.save();
+        // Toast
+        const t = document.createElement('div');
+        t.className = 'toast success';
+        t.textContent = 'Saved successfully';
+        document.getElementById('toastContainer').appendChild(t);
+        setTimeout(() => t.remove(), 2000);
+    }
+};
+
+// Bind Global Actions
+window.Actions = Actions;
+
+// Event Listeners
+document.addEventListener('DOMContentLoaded', () => {
+    UI.init();
+
+    document.getElementById('runSaveBtn').addEventListener('click', Actions.save);
+    document.getElementById('resetBtn').addEventListener('click', Actions.reset);
+    document.getElementById('exportBtn').addEventListener('click', Actions.exportData);
+    document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
+    document.getElementById('importFile').addEventListener('change', Actions.importData);
+});

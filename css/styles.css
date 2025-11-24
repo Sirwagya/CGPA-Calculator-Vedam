@@ -2,6 +2,7 @@
   /* Modern Color Palette */
   --bg-app: #f9fafb;
   --bg-card: #ffffff;
+  --bg-pending: #f3f4f6;
 
   --primary: #4f46e5; /* Indigo 600 */
   --primary-hover: #4338ca;
@@ -97,6 +98,9 @@ body {
   cursor: pointer;
   transition: all 0.2s;
   border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn-primary {
@@ -137,6 +141,7 @@ body {
   color: var(--primary);
   background: transparent;
   padding-left: 0;
+  justify-content: flex-start;
 }
 
 .btn-text:hover {
@@ -258,6 +263,13 @@ body {
 .input-row {
   display: flex;
   gap: 8px;
+  transition: opacity 0.2s;
+}
+
+.input-row.is-pending input[type="number"] {
+  background-color: var(--bg-pending);
+  color: var(--text-muted);
+  border-color: var(--border);
 }
 
 input[type="number"] {
@@ -278,8 +290,6 @@ input[type="number"]:focus {
 }
 
 input[type="number"]:disabled {
-  background: #f3f4f6;
-  color: var(--text-muted);
   cursor: not-allowed;
 }
 
@@ -386,10 +396,15 @@ input[type="number"]:disabled {
   background: transparent;
   border: none;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
 }
 
 .btn-icon:hover {
   color: var(--danger);
+  background: var(--danger-bg);
 }
 
 /* Summary Section */
